@@ -6,7 +6,7 @@
 ### 개발기간  
 2023.07.04 - 2023.08.18
 ### 주제
-매물 실시간 방송 서비스 제공 어플
+자취 등 집을 구할 때, 겪는 시,공간적  제약을 벗어나기 위해 부동산 업자가 직접 Live 방송을 통해 매물을 소개해줄 수 있는 부동산 모바일 앱
 
 #### 사용 기술 스택
 
@@ -74,7 +74,8 @@ https://youtu.be/E6jkImXQNa8
 
 ### 백엔드
 ##### 김기헌
-    - 아키텍쳐 , 시퀀스 설계
+    - PM
+    - 아키텍쳐, 시퀀스 설계
     - 배포 스크립트 작성 
     - 로그 저장, 분석
     - 지역별 주간 랭킹 선정
@@ -100,6 +101,15 @@ https://youtu.be/E6jkImXQNa8
 
 
 ----
+#### ER-Diagram 제작  
+![erd](readme_assets/erd.PNG)
+
+#### Architecture
+![arch](readme_assets/architecture.png)
+
+#### 명세서
+[기능명세서/API명세서](https://docs.google.com/spreadsheets/d/1O8tJik-yb2d7x9Nqm7bvH7MYdZcXFeiq4Sb5f2xZhYU/edit?usp=sharing)
+![API1](readme_assets/api1.PNG)
 
 ## 정보구조도 
 ![정보구조도](readme_assets/userIA.png)
@@ -127,24 +137,6 @@ https://youtu.be/E6jkImXQNa8
 </div>
 
 
-
-## Backend
-#### ERD 제작  
-![erd](readme_assets/erd.PNG)
-
-#### 아키텍쳐
-![arch](readme_assets/architecture.png)
-
-#### 명세서
-[기능명세서/API명세서](https://docs.google.com/spreadsheets/d/1O8tJik-yb2d7x9Nqm7bvH7MYdZcXFeiq4Sb5f2xZhYU/edit?usp=sharing)
-![API1](readme_assets/api1.PNG)
-
-#### Swagger
-[auth](http://i9a803.p.ssafy.io:8080/swagger-ui/index.html)
-
-[business](http://i9a803.p.ssafy.io:8081/swagger-ui/index.html)
-
-[notice](http://i9a803.p.ssafy.io:8082/swagger-ui/index.html)
 
 -----
 
@@ -221,6 +213,6 @@ business swagger
 http://i9a803.p.ssafy.io:8081/swagger-ui/index.html
 
 notice swagger
-http://i9a803.p.ssafy.io:8082/swagger-ui/index.html -->
+http://i9a803.p.ssafy.io:8082/swagger-ui/index.html
 
 

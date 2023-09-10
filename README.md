@@ -114,9 +114,21 @@ Git을 통한 협업 방식은 [우아한 형제들 Git Flow](https://techblog.w
 - `frontend`, `backend`: develop 브랜치에서 분기해서 프론트엔드와 백엔드가 각각 개발하는 브랜치입니다. 프론트엔드와 백엔드 충돌을 최대한 방지하기 위해 만들어졌습니다.
 - `feature`: 기능 단위 개발을 위한 브랜치로 dev-front, dev-back에서 분기하여 개발이 끝나면 각각 베이스 브랜치로 병합됩니다.
 
-## 프로젝트 회고
-나 또한 경험이 부족했지만 팀원들의 경우 프로젝트 경험이 모두 없었기에 설계 부분에서 많은 시간이 소요되었다. 
 
+## MSA를 통한 분산 처리
+    - Auth: 인증 및 인가 담당
+    - Business: 매물 관련 서비스 담당
+    - Notification Producer - Notification Consumer: Kafka로 통신, 관심 매물 Live 방송 공지 알림 + Live 방송 시작 알림 + DM 알림
+    - ViewCalculator: 로그 관리 및 지역별 주간 랭킹 산정
+- 고가용성(high availability)확보 위해 캐시 서버(Redis) Master - Slave 2개의 구조 + Sentinel
+
+## 설계 및 UCC 등 정리 노션
+https://www.notion.so/Watson-a38edbba5ca047629c04d70822f2b112?pvs=4
+
+ 
+## 프로젝트 회고
+
+나 또한 경험이 부족했지만 팀원들의 경우 프로젝트 경험이 모두 없었기에 설계 부분에서 많은 시간이 소요되었다. 
 물론 완벽하게 설계 후 시작할 수는 없겠지만 그동안의 경험상 설계를 부실하게 했을 경우 구현 시 설계를 계속해서 바꾸어야 했고, 시간이 그만큼 더 소요 되었던 점을 인지하여 DB, 시퀀스, 아키텍쳐, API 등의 설계에 힘을 쏟았다.
 
 특히 처음 경험하는 MSA 구조 설계였기 때문에, 설계 부분에서 무려 1주일이 넘는 시간이 소요되었다. 그동안 CRUD 위주의 프로젝트를 해왔기에, 설계만 제대로 되었다면 규모가 크더라도 구현은 금방 할 수 있다고 생각했다. 하지만 프로젝트 기간은 6주였고, 남은 3주의 시간 동안 개발, CI/CD, 배포, 프론트엔드와의 병합까지 해야 했다. 
@@ -134,6 +146,71 @@ Git을 통한 협업 방식은 [우아한 형제들 Git Flow](https://techblog.w
 추가적으로 아쉬운 점이 있다면 2학기 되면서 프로젝트를 하며 코드리뷰를 적극적으로 하고 싶었지만,  프로젝트 기간이 6주였고, 마지막 1주는 테스트, 배포, 발표 준비, UCC 등에 시간을 쏟아야 했기 때문에, 기획, 설계를 제외하면 실질적 개발 시간이 약 3주밖에 되지 않았다. 누군가는 개발도 하고 코드 리뷰, 리팩토링도 잘 할 수 있는 시간이었겠지만 개발 경험이 많지 않았던 우리 팀에게는 개발하기에도 시간이 부족했다. 다음 프로젝트 때는 꼭..! 코드 리뷰를 통해 더 좋은 코드를 작성할 수 있도록 하자!
 
 
+
+## 나의 개발
+- Redis 서버 구축
+    - 고가용성 확보를 위한 Master - Slave 2 구조와 sentinel
+- 지역 별 주간 랭킹 산정
+    - 하루 전 모든 로그 조회
+    - 모든 매물에 대한 조회수(user - house 하루에 최대 1번) 계산
+    
+    ```java
+    for (LogDto logDto : list) {
+    		String dongleeName = logDto.getDongleeName();
+    		Long houseId = logDto.getHouseId();
+    		LocalDate logDate = logDto.getLogDate();
+    
+    		dailyViewCountMap.compute(houseId, (key, oldValue) ->
+    			  oldValue == null
+    				    ? new HashMapCustomValue(logDate, dongleeName, 1L)
+                : new HashMapCustomValue(oldValue.getLogDate(), oldValue.getDongleeName(), oldValue.getViewCount() + 1)
+        );
+    }
+    ```
+    
+    - houseId(매물 별) 조회수를 바탕으로 Redis에 저장 및 zSet을 통한 자동 정렬
+        - `setName`: region + logDate (expireTime 8day)
+        - `key`: {`houseId`}
+        - `value`: `viewCount`
+    
+    ```java
+    for (Map.Entry<Long, HashMapCustomValue> entry : dailyViewCountMap.entrySet()) {
+    		Long houseId = entry.getKey();
+        HashMapCustomValue tmp = entry.getValue();
+    
+        String dongleeName = tmp.getDongleeName();
+        String logDate = tmp.getLogDate().toString();
+        Long viewCount = tmp.getViewCount();
+    
+        String zSetName = "daily:viewCount:" + dongleeName + ":" + logDate;
+        redisTemplate.opsForZSet().add(zSetName, houseId.toString(), viewCount);
+        redisTemplate.expire(zSetName, 8, TimeUnit.DAYS);
+    }
+    ```
+    
+    - 지역별 주간 조회수 Top 5 선정
+    
+    ```java
+    public List<String> getWeeklyRankByDongleeName(String dongleeName) {
+            List<String> zSetKeys = new ArrayList<>();
+            IntStream.rangeClosed(1, 7)
+                    .mapToObj(i -> LocalDate.now().minusDays(i))
+                    .map(date -> "daily:viewCount:" + dongleeName + ":" + date)
+                    .forEach(zSetKeys::add);
+    
+            String tmpKey = "weekly:temp" + dongleeName;
+    
+            zSetOperations.unionAndStore(tmpKey, zSetKeys, tmpKey);
+    
+            List<String> top5List = new ArrayList<>();
+            Set<Object> top5Set = zSetOperations.reverseRange(tmpKey, 0, 4);
+    
+            if (top5Set == null) return new ArrayList<>();
+            top5Set.forEach(house -> top5List.add(house.toString()));
+    
+            return top5List;
+        }
+    ```
 ----
 #### ER-Diagram 제작  
 ![erd](readme_assets/erd.PNG)
